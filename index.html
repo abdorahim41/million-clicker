@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>Million Click - Become a Mogul</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <div id="game-container">
+        <!-- Top Bar: Stats -->
+        <header id="top-bar">
+            <div class="stat-box">
+                <span class="label">Balance:</span>
+                <span id="balance" class="value">$0</span>
+            </div>
+            <div class="stat-box income">
+                <span class="label">Income:</span>
+                <span id="income" class="value">+$0/s</span>
+            </div>
+            <div class="stat-box expenses">
+                <span class="label">Expenses:</span>
+                <span id="expenses" class="value">-$0/s</span>
+            </div>
+            <button id="shop-toggle" class="btn-primary">Shop</button>
+        </header>
+        <!-- Main Game World -->
+        <main id="world-view">
+            <div id="background-layer"></div>
+            <div id="assets-layer"></div>
+            
+            <div id="click-area">
+                <button id="click-button">
+                    <span class="icon">$</span>
+                </button>
+                <div id="click-value-display">Click Value: $1</div>
+            </div>
+        </main>
+        <!-- Shop Sidebar -->
+        <aside id="shop-panel" class="hidden">
+            <div class="shop-header">
+                <h2>Marketplace</h2>
+                <button id="close-shop">✕</button>
+            </div>
+            <div class="shop-tabs">
+                <button class="tab-btn active" data-tab="power">Power</button>
+                <button class="tab-btn" data-tab="passive">Income</button>
+                <button class="tab-btn" data-tab="life">Life</button>
+            </div>
+            <div class="shop-content">
+                <div id="shop-items"></div>
+            </div>
+            <div class="ad-reward-box">
+                <div class="ad-placeholder">YOUR AD HERE</div>
+                <button id="reward-ad-btn" class="btn-accent">Watch Ad (+$1,000)</button>
+            </div>
+        </aside>
+        <!-- Bottom Banner Ad -->
+        <footer id="bottom-ad">
+            <div class="ad-banner-placeholder">
+                YOUR AD HERE - SPONSOR MILLION CLICK
+            </div>
+        </footer>
+        <!-- Bankruptcy Modal -->
+        <div id="bankruptcy-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 class="text-destructive">BANKRUPTCY!</h2>
+                <p>You've run out of money! Your lifestyle was too expensive.</p>
+                <div class="modal-actions">
+                    <button id="bailout-btn" class="btn-success">Watch Ad for Bailout (+$1,000)</button>
+                    <button id="restart-btn" class="btn-outline">Restart Game</button>
+                </div>
+            </div>
+        </div>
+        <!-- Win Modal -->
+        <div id="win-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 class="text-success">YOU WON!</h2>
+                <p>You own a Castle and 5 Cars. You are a true Mogul!</p>
+                <div class="modal-actions">
+                    <button id="continue-btn" class="btn-primary">Continue Playing</button>
+                    <button id="reset-win-btn" class="btn-outline">New Game</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
