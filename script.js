@@ -374,8 +374,21 @@ class GameEngine {
         this.saveGame();
     }
 }
+document.getElementById('reward-ad-btn').onclick = () => {
+    if(window.AdsterraRewarded) {
+        AdsterraRewarded.showAd({
+            onClose: () => {
+                game.cheatMoney(1000); // مكافأة اللاعب
+            }
+        });
+    } else {
+        game.cheatMoney(0); // احتياطي إذا لم يتم تحميل الإعلان
+        alert("Adsterra not loaded, bonus added!");
+    }
+};
 
 // Start Game
 window.onload = () => {
     window.game = new GameEngine();
 };
+
