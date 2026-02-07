@@ -1,31 +1,32 @@
 /**
  * Million Click - Main Game Script
- * (تم تحديث رابط الإعلان المباشر - Direct Link Updated)
+ * (Fixed: Shop Jittering & Updated Logic)
  */
 
 // --- Game Data ---
 const ITEMS = {
-    // Power Shop
-    'mouse_1': { id: 'mouse_1', name: 'Pro Mouse', type: 'power', cost: 50, effect: 1, desc: '+1 Click Value' },
-    'coffee': { id: 'coffee', name: 'Espresso', type: 'power', cost: 250, effect: 5, desc: '+5 Click Value' },
+    // Power Shop (تكرار الشراء)
+    'mouse_1': { id: 'mouse_1', name: 'Pro Mouse', type: 'power', cost: 100, effect: 1, desc: '+1 Click Value' },
+    'coffee': { id: 'coffee', name: 'Espresso', type: 'power', cost: 500, effect: 5, desc: '+5 Click Value' },
     'keyboard': { id: 'keyboard', name: 'Mechanical Keyboard', type: 'power', cost: 1000, effect: 15, desc: '+15 Click Value' },
     
-    // Passive Income Shop
-    'lemonade': { id: 'lemonade', name: 'Lemonade Stand', type: 'passive', cost: 100, effect: 2, desc: '+$2/sec' },
+    // Passive Income Shop (تكرار الشراء)
+    'lemonade': { id: 'lemonade', name: 'Lemonade Stand', type: 'passive', cost: 100, effect: 1, desc: '+$1/sec' },
     'news': { id: 'news', name: 'Paper Route', type: 'passive', cost: 500, effect: 8, desc: '+$8/sec' },
-    'coding': { id: 'coding', name: 'Freelance Gig', type: 'passive', cost: 2000, effect: 25, desc: '+$25/sec' },
-    'crypto': { id: 'crypto', name: 'Mining Rig', type: 'passive', cost: 10000, effect: 100, desc: '+$100/sec' },
+    'coding': { id: 'coding', name: 'Freelance Gig', type: 'passive', cost: 2000, effect: 20, desc: '+$20/sec' },
+    'crypto': { id: 'crypto', name: 'Mining Rig', type: 'passive', cost: 9999, effect: 100, desc: '+$100/sec' },
 
-    // Life Shop
-    'apartment': { id: 'apartment', name: 'Studio Apt', type: 'life', cost: 5000, effect: -10, desc: 'Upkeep -$10/sec', bgName: 'Studio Apt' },
-    'house': { id: 'house', name: 'Modern Villa', type: 'life', cost: 25000, effect: -50, desc: 'Upkeep -$50/sec', bgName: 'Modern-Villa' },
-    'castle': { id: 'castle', name: 'Medieval Castle', type: 'life', cost: 100000, effect: -200, desc: 'Upkeep -$200/sec', bgName: 'Castle' },
+    // Life Shop (شراء مرة واحدة - Unique)
+    'apartment': { id: 'apartment', name: 'Wooden House', type: 'life', cost: 5000, effect: -100, desc: 'Upkeep -$100/sec', bgName: 'Studio Apt' },
+    'house': { id: 'house', name: 'House', type: 'life', cost: 25000, effect: -500, desc: 'Upkeep -$500/sec', bgName: 'Modern-Villa' },
+    'castle': { id: 'castle', name: 'Medieval Castle', type: 'life', cost: 100000, effect: -2000, desc: 'Upkeep -$2000/sec', bgName: 'Castle' },
     
-    // Assets
-    'sedan': { id: 'sedan', name: 'Family Sedan', type: 'asset', cost: 2000, effect: -5, desc: 'Cost -$5/sec', imgName: 'Family Sedan' },
-    'sportscar': { id: 'sportscar', name: 'Sports Car', type: 'asset', cost: 50000, effect: -100, imgName: 'Sports Car' }
+    // Assets (شراء مرة واحدة - Unique)
+    'sedan': { id: 'sedan', name: 'Family Sedan', type: 'asset', cost: 2000, effect: -50, desc: 'Cost -$50/sec', imgName: 'Family Sedan' },
+    'sportscar': { id: 'sportscar', name: 'Sports Car', type: 'asset', cost: 50000, effect: -10000, imgName: 'Sports Car' }
 };
 
+// --- INITIAL STATE ---
 const INITIAL_STATE = {
     balance: 0,
     lifetimeEarnings: 0,
@@ -35,23 +36,25 @@ const INITIAL_STATE = {
     sessionId: localStorage.getItem('clicker_session') || crypto.randomUUID()
 };
 
-// --- إعدادات الإعلان ---
 const AD_CONFIG = {
-    // تم وضع الرابط الخاص بك هنا
     url: "https://www.effectivegatecpm.com/fgtrsv88h0?key=f440394394ddfb61b10d811ce16ed699",
-    duration: 15, // مدة الانتظار بالثواني
-    reward: 1000  // قيمة الجائزة
+    duration: 15,
+    reward: 500
 };
 
+const BASE_EXPENSE_PER_SECOND = 100 / 60; 
+
 function imagePath(name) {
-    return `${encodeURIComponent(name)}.jfif`;
+    return `${encodeURIComponent(name)}.png`;
 }
 
 class GameEngine {
     constructor() {
         this.state = { ...INITIAL_STATE };
-        this.adTimerActive = false; 
-        
+        this.adTimerActive = false;
+        this.graceSeconds = 5; 
+        this.graceEnd = Date.now() + this.graceSeconds * 1000;
+
         this.saveSessionId();
         this.initDOM();
         this.loadGame();
@@ -85,14 +88,23 @@ class GameEngine {
             resetWinBtn: document.getElementById('reset-win-btn')
         };
 
+        const winText = this.el.winModal.querySelector('p');
+        if (winText) winText.innerText = "You own all Houses and Cars. You are a true Mogul!";
+
         this.el.shopToggle.onclick = () => this.toggleShop(true);
         this.el.closeShop.onclick = () => this.toggleShop(false);
-        this.el.clickButton.onclick = (e) => this.handleClick(e);
+
+        // Disable Enter key
+        this.el.clickButton.tabIndex = -1;
+        this.el.clickButton.onkeydown = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); return false; }
+        };
+        this.el.clickButton.onclick = (e) => {
+            if (e.detail !== 0) this.handleClick(e);
+        };
         
-        // ربط الأزرار بنظام الفيديو الجديد
         this.el.rewardBtn.onclick = () => this.watchVideoAd(this.el.rewardBtn);
         this.el.bailoutBtn.onclick = () => this.watchVideoAd(this.el.bailoutBtn, true);
-
         this.el.restartBtn.onclick = () => this.resetGame();
         this.el.continueBtn.onclick = () => this.el.winModal.classList.add('hidden');
         this.el.resetWinBtn.onclick = () => this.resetGame();
@@ -106,48 +118,45 @@ class GameEngine {
         });
 
         this.currentTab = 'power';
+        // الرسم المبدئي للمتجر مرة واحدة
         this.renderShop(this.currentTab);
         this.updateBackground();
+        this.updateUI();
     }
 
-    // --- Video Ad Logic Start ---
     watchVideoAd(btnElement, isBailout = false) {
         if (this.adTimerActive) return;
-
-        // فتح الرابط الخاص بك
-        window.open(AD_CONFIG.url, '_blank');
+        try { window.open(AD_CONFIG.url, '_blank', 'noopener,noreferrer'); } 
+        catch (e) { console.warn('blocked', e); }
 
         this.adTimerActive = true;
-        let timeLeft = AD_CONFIG.duration;
-        const originalText = isBailout ? "Watch Ad for Bailout" : "Watch Ad (+$1,000)";
+        let timeLeft = Math.floor(AD_CONFIG.duration);
+        const originalText = isBailout ? "Watch Ad for Bailout" : `Watch Ad (+$${AD_CONFIG.reward})`;
         
         btnElement.disabled = true;
         btnElement.style.opacity = "0.7";
+        btnElement.innerText = `Watching... ${timeLeft}s`;
 
         const timerInterval = setInterval(() => {
-            btnElement.innerText = `Watching... ${timeLeft}s`;
             timeLeft--;
-
-            if (timeLeft < 0) {
+            if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 this.completeAdReward(btnElement, originalText, isBailout);
+            } else {
+                btnElement.innerText = `Watching... ${timeLeft}s`;
             }
         }, 1000);
     }
 
     completeAdReward(btnElement, originalText, isBailout) {
         this.adTimerActive = false;
-        
         this.cheatMoney(AD_CONFIG.reward);
         this.spawnFloatingText(window.innerWidth / 2, window.innerHeight / 2, `+$${AD_CONFIG.reward} Reward!`);
 
-        if (isBailout) {
-            this.el.bankruptcyModal.classList.add('hidden');
-        }
+        if (isBailout) this.el.bankruptcyModal.classList.add('hidden');
 
         btnElement.innerText = "Claimed!";
         btnElement.classList.add('btn-success');
-        
         setTimeout(() => {
             btnElement.innerText = originalText;
             btnElement.disabled = false;
@@ -155,7 +164,6 @@ class GameEngine {
             btnElement.classList.remove('btn-success');
         }, 2000);
     }
-    // --- Video Ad Logic End ---
 
     async loadGame() {
         try {
@@ -166,6 +174,8 @@ class GameEngine {
                 this.updateUI();
                 this.updateBackground();
                 this.renderAssets();
+                // إعادة رسم المتجر لتحديث حالة Owned بعد التحميل
+                this.renderShop(this.currentTab);
             }
         } catch (e) { console.error(e); }
     }
@@ -201,7 +211,12 @@ class GameEngine {
     }
 
     calculateStats() {
-        let income = 0; let expenses = 0; let clickValue = 1;
+        let income = 0;
+        const now = Date.now();
+        const graceActive = now < this.graceEnd;
+        let expenses = graceActive ? 0 : BASE_EXPENSE_PER_SECOND; 
+        let clickValue = 1;
+
         Object.entries(this.state.inventory).forEach(([id, count]) => {
             const item = ITEMS[id];
             if (!item) return;
@@ -209,15 +224,20 @@ class GameEngine {
             if (item.type === 'passive') income += item.effect * count;
             if (item.type === 'life' || item.type === 'asset') expenses += Math.abs(item.effect) * count;
         });
-        return { income, expenses, clickValue };
+
+        const graceRemaining = Math.max(0, Math.ceil((this.graceEnd - now) / 1000));
+        return { income, expenses, clickValue, graceActive, graceRemaining };
     }
 
     handleClick(e) {
+        if (!e || e.detail === 0) return;
         const stats = this.calculateStats();
         this.state.balance += stats.clickValue;
         this.state.lifetimeEarnings += stats.clickValue;
         this.state.clickCount++;
-        this.spawnFloatingText(e.clientX, e.clientY, `+$${stats.clickValue}`);
+        const x = (e && e.clientX) ? e.clientX : window.innerWidth / 2;
+        const y = (e && e.clientY) ? e.clientY : window.innerHeight / 2;
+        this.spawnFloatingText(x, y, `+$${stats.clickValue}`);
         this.updateUI();
     }
 
@@ -233,11 +253,16 @@ class GameEngine {
 
     buyItem(id) {
         const item = ITEMS[id];
+        if ((item.type === 'life' || item.type === 'asset') && (this.state.inventory[id] || 0) >= 1) return;
+
         if (this.state.balance >= item.cost) {
             this.state.balance -= item.cost;
             this.state.inventory[id] = (this.state.inventory[id] || 0) + 1;
+            
             if (item.type === 'life') this.updateBackground();
             if (item.type === 'asset') this.renderAssets();
+            
+            // نعيد رسم المتجر بالكامل فقط هنا لأن حالة الزر تغيرت (من Buy إلى Owned)
             this.renderShop(this.currentTab);
             this.updateUI();
             this.saveGame();
@@ -246,8 +271,13 @@ class GameEngine {
 
     toggleShop(open) {
         this.el.shopPanel.classList.toggle('hidden', !open);
+        // عند الفتح، تأكد من تحديث الأزرار مرة واحدة
+        if (open) {
+            this.renderShop(this.currentTab);
+        }
     }
 
+    // هذه الدالة تبني المتجر (تستدعى عند الضرورة فقط)
     renderShop(tab) {
         this.currentTab = tab;
         this.el.shopItems.innerHTML = '';
@@ -257,18 +287,68 @@ class GameEngine {
         });
         filtered.forEach(item => {
             const count = this.state.inventory[item.id] || 0;
+            const isUnique = (item.type === 'life' || item.type === 'asset');
+            const isOwned = isUnique && count >= 1;
+
             const div = document.createElement('div');
-            div.className = `shop-item ${this.state.balance < item.cost ? 'locked' : ''}`;
+            div.className = 'shop-item';
+            // نستخدم Dataset لربط العنصر بالكود لاحقاً
+            div.dataset.id = item.id; 
+            div.dataset.cost = item.cost;
+            div.dataset.owned = isOwned;
+
+            let buttonText = "Buy";
+            let buttonClass = "btn-primary";
+            let buttonDisabled = false;
+
+            if (isOwned) {
+                buttonText = "Owned";
+                buttonClass = "btn-success";
+                buttonDisabled = true;
+            } else if (this.state.balance < item.cost) {
+                // لا نعطل الزر هنا في الـ HTML مباشرة بل نتركه لدالة التحديث، لكن يمكن وضع حالة مبدئية
+                // buttonDisabled = true; // (اختياري)
+            }
+
             div.innerHTML = `
                 <div class="item-info">
-                    <span class="item-name">${item.name} (${count})</span>
+                    <span class="item-name">${item.name} ${!isUnique ? `(${count})` : ''}</span>
                     <span class="item-desc">${item.desc}</span>
                     <div class="item-cost">$${item.cost.toLocaleString()}</div>
                 </div>
-                <button class="btn-primary" ${this.state.balance < item.cost ? 'disabled' : ''}>Buy</button>
+                <button class="${buttonClass}" ${buttonDisabled ? 'disabled' : ''}>${buttonText}</button>
             `;
-            div.querySelector('button').onclick = () => this.buyItem(item.id);
+            
+            if (!buttonDisabled) {
+                div.querySelector('button').onclick = () => this.buyItem(item.id);
+            }
+            
             this.el.shopItems.appendChild(div);
+        });
+        
+        // استدعاء تحديث الأزرار فوراً لضبط حالة التمكين/التعطيل
+        this.updateShopButtons();
+    }
+
+    // دالة جديدة: تحديث حالة الأزرار فقط (خفيفة جداً، لا تسبب ارتجاج)
+    updateShopButtons() {
+        if (this.el.shopPanel.classList.contains('hidden')) return;
+
+        const shopItems = this.el.shopItems.querySelectorAll('.shop-item');
+        shopItems.forEach(div => {
+            const cost = parseInt(div.dataset.cost);
+            const isOwned = div.dataset.owned === 'true';
+            const btn = div.querySelector('button');
+            
+            if (!isOwned) {
+                if (this.state.balance < cost) {
+                    btn.disabled = true;
+                    div.classList.add('locked');
+                } else {
+                    btn.disabled = false;
+                    div.classList.remove('locked');
+                }
+            }
         });
     }
 
@@ -282,26 +362,15 @@ class GameEngine {
 
     renderAssets() {
         this.el.assets.innerHTML = '';
-        if (this.state.inventory['apartment']) this.createAssetImg(imagePath(ITEMS['apartment'].bgName), '20%', '10%', '150px');
-        if (this.state.inventory['house']) this.createAssetImg(imagePath(ITEMS['house'].bgName), '25%', '70%', '180px');
-        if (this.state.inventory['castle']) this.createAssetImg(imagePath(ITEMS['castle'].bgName), '30%', '40%', '250px');
-
-        let carX = 10;
         const sedans = this.state.inventory['sedan'] || 0;
         const sports = this.state.inventory['sportscar'] || 0;
-        for (let i = 0; i < sedans; i++) { this.createCarImg(imagePath(ITEMS['sedan'].imgName), carX); carX += 8; }
-        for (let i = 0; i < sports; i++) { this.createCarImg(imagePath(ITEMS['sportscar'].imgName), carX); carX += 10; }
-    }
-
-    createAssetImg(src, bottom, left, width) {
-        const img = document.createElement('img');
-        img.src = src; img.className = 'asset-img'; img.style.bottom = bottom; img.style.left = left; img.style.width = width;
-        this.el.assets.appendChild(img);
+        if (sedans > 0) this.createCarImg(imagePath(ITEMS['sedan'].imgName), 15); 
+        if (sports > 0) this.createCarImg(imagePath(ITEMS['sportscar'].imgName), 35); 
     }
 
     createCarImg(src, left) {
         const img = document.createElement('img');
-        img.src = src; img.className = 'asset-img car-img'; img.style.bottom = '5%'; img.style.left = `${left}%`; img.style.height = '50px'; img.style.width = 'auto';
+        img.src = src; img.className = 'asset-img car-img'; img.style.bottom = '5%'; img.style.left = `${left}%`; img.style.height = '400px'; img.style.width = 'auto';
         this.el.assets.appendChild(img);
     }
 
@@ -309,28 +378,25 @@ class GameEngine {
         const stats = this.calculateStats();
         this.el.balance.innerText = `$${Math.floor(this.state.balance).toLocaleString()}`;
         this.el.income.innerText = `+$${stats.income}/s`;
-        this.el.expenses.innerText = `-$${stats.expenses}/s`;
-        this.el.clickValueDisplay.innerText = `Click Value: $${stats.clickValue}`;
-        if (!this.el.shopPanel.classList.contains('hidden')) {
-             const buttons = this.el.shopItems.querySelectorAll('button');
-             const items = Object.values(ITEMS).filter(i => {
-                if (this.currentTab === 'life') return i.type === 'life' || i.type === 'asset';
-                return i.type === this.currentTab;
-            });
-            buttons.forEach((btn, idx) => {
-                const item = items[idx];
-                btn.disabled = this.state.balance < item.cost;
-                btn.parentElement.classList.toggle('locked', this.state.balance < item.cost);
-            });
+
+        if (stats.graceActive) {
+            this.el.expenses.innerText = `-$${stats.expenses}/s (grace ${stats.graceRemaining}s)`;
+        } else {
+            this.el.expenses.innerText = `-$${stats.expenses.toFixed(2)}/s (Base: $${BASE_EXPENSE_PER_SECOND.toFixed(2)}/s)`;
         }
+
+        this.el.clickValueDisplay.innerText = `Click Value: $${stats.clickValue}`;
+        
+        // استبدلنا renderShop بـ updateShopButtons لمنع الارتجاج
+        this.updateShopButtons();
     }
 
-    checkBankruptcy() { if (this.state.balance < 0) this.el.bankruptcyModal.classList.remove('hidden'); }
+    checkBankruptcy() { if (Date.now() >= this.graceEnd && this.state.balance < 0) this.el.bankruptcyModal.classList.remove('hidden'); }
 
     checkWinCondition() {
-        const hasCastle = (this.state.inventory['castle'] || 0) >= 1;
-        const carCount = (this.state.inventory['sedan'] || 0) + (this.state.inventory['sportscar'] || 0);
-        if (hasCastle && carCount >= 5 && !this.winTriggered) {
+        const requiredIds = ['apartment', 'house', 'castle', 'sedan', 'sportscar'];
+        const hasAll = requiredIds.every(id => (this.state.inventory[id] || 0) >= 1);
+        if (hasAll && !this.winTriggered) {
             this.el.winModal.classList.remove('hidden');
             this.winTriggered = true;
         }
@@ -338,8 +404,11 @@ class GameEngine {
 
     cheatMoney(amount) { this.state.balance += amount; this.updateUI(); }
 
+    
+
     resetGame() {
         this.state = { ...INITIAL_STATE, sessionId: crypto.randomUUID() };
+        this.graceEnd = Date.now() + this.graceSeconds * 1000;
         this.saveSessionId();
         this.winTriggered = false;
         this.el.bankruptcyModal.classList.add('hidden');
@@ -347,6 +416,7 @@ class GameEngine {
         this.updateBackground();
         this.renderAssets();
         this.updateUI();
+        this.renderShop(this.currentTab);
         this.saveGame();
     }
 }
